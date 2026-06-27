@@ -9,6 +9,8 @@ venv/
 .test-deps/
 .phase2-deps/
 .phase3-deps/
+.phase4-deps/
+.models/
 .pytest_cache/
 .coverage
 

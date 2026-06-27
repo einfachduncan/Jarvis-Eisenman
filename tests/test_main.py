@@ -6,6 +6,7 @@ from config import ConfigurationError
 from gemini_client import ChatMessage, GeminiError
 from main import run_chat
 from voice import VoiceError
+from wakeword import WakeWordError
 
 
 class ChatTests(unittest.TestCase):
@@ -198,8 +199,72 @@ class ChatTests(unittest.TestCase):
         )
 
         self.assertEqual(result, 0)
-        voice.interrupt.assert_called_once_with(wait=True)
+        voice.interrupt.assert_called_with(wait=True)
         output.assert_any_call("\nSpeech interrupted.")
+
+    def test_sleep_mode_waits_for_wake_word_then_uses_voice(self):
+        answers = iter(["sleep", "exit"])
+        output = Mock()
+        session = Mock()
+        session.stream.return_value = iter(["Ready."])
+        voice = Mock()
+        voice.listen.return_value = "Status report"
+        wake_word = Mock()
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            lambda: session,
+            lambda: voice,
+            lambda: wake_word,
+        )
+
+        self.assertEqual(result, 0)
+        wake_word.enter_sleep_mode.assert_called_once_with()
+        wake_word.wait_for_activation.assert_called_once_with()
+        wake_word.pause.assert_called_once_with()
+        wake_word.stop.assert_called_once_with()
+        session.stream.assert_called_once_with("Status report")
+        voice.speak.assert_called_once_with("Ready.", blocking=True)
+        output.assert_any_call("Hey Jarvis detected. Listening...")
+
+    def test_sleep_mode_can_be_cancelled(self):
+        answers = iter(["sleep", "exit"])
+        output = Mock()
+        wake_word = Mock()
+        wake_word.wait_for_activation.side_effect = KeyboardInterrupt
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            Mock(),
+            Mock(),
+            lambda: wake_word,
+        )
+
+        self.assertEqual(result, 0)
+        wake_word.pause.assert_called_once_with()
+        output.assert_any_call("\nSleep mode cancelled.")
+
+    def test_wake_word_error_does_not_close_chat(self):
+        answers = iter(["sleep", "exit"])
+        output = Mock()
+        wake_word = Mock()
+        wake_word.enter_sleep_mode.side_effect = WakeWordError("model missing")
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            Mock(),
+            Mock(),
+            lambda: wake_word,
+        )
+
+        self.assertEqual(result, 0)
+        output.assert_any_call("Wake-word error: model missing")
 
     def test_keyboard_interrupt_exits_cleanly(self):
         output = Mock()

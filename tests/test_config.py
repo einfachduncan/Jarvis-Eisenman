@@ -7,6 +7,7 @@ from config import (
     DEFAULT_MODEL,
     get_settings,
     get_voice_settings,
+    get_wake_word_settings,
 )
 
 
@@ -77,3 +78,30 @@ class VoiceSettingsTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ConfigurationError, "between 0 and 1"):
                 get_voice_settings()
+
+
+class WakeWordSettingsTests(unittest.TestCase):
+    @patch("config.load_dotenv")
+    def test_wake_word_settings_are_loaded(self, _load_dotenv):
+        environment = {
+            "WAKE_WORD_MODEL": "custom_model",
+            "WAKE_WORD_THRESHOLD": "0.65",
+            "WAKE_WORD_FRAME_DURATION": "0.1",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            settings = get_wake_word_settings()
+
+        self.assertEqual(settings.model, "custom_model")
+        self.assertEqual(settings.model_directory.name, "openwakeword")
+        self.assertEqual(settings.threshold, 0.65)
+        self.assertEqual(settings.frame_duration, 0.1)
+
+    @patch("config.load_dotenv")
+    def test_invalid_wake_word_threshold_is_rejected(self, _load_dotenv):
+        with patch.dict(
+            os.environ,
+            {"WAKE_WORD_THRESHOLD": "1.5"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ConfigurationError, "THRESHOLD"):
+                get_wake_word_settings()
