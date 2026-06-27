@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 
 from config import ConfigurationError
-from gemini_client import ChatMessage, ChatSession, GeminiError
+from ollama_client import ChatMessage, OllamaChatSession, OllamaError
 from voice import Voice, VoiceError
 from wakeword import WakeWordError, WakeWordService
 
@@ -42,7 +42,7 @@ def run_chat(
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
     stream_output_fn: Callable[[str], None] | None = None,
-    session_factory: Callable[[], ChatSession] = ChatSession,
+    session_factory: Callable[[], OllamaChatSession] = OllamaChatSession,
     voice_factory: Callable[[], Voice] = Voice,
     wake_word_factory: Callable[[], WakeWordService] = WakeWordService,
 ) -> int:
@@ -51,7 +51,7 @@ def run_chat(
 
     try:
         session = session_factory()
-    except (ConfigurationError, GeminiError) as exc:
+    except (ConfigurationError, OllamaError) as exc:
         output_fn(f"Configuration error: {exc}")
         return 1
 
@@ -146,7 +146,7 @@ def run_chat(
                     response_parts.append(chunk)
                     write(chunk)
                 write("\n")
-            except (ConfigurationError, GeminiError, ValueError) as exc:
+            except (ConfigurationError, OllamaError, ValueError) as exc:
                 write("\n")
                 output_fn(f"Error: {exc}")
                 continue

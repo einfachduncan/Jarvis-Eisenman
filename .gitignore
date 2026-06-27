@@ -11,6 +11,7 @@ venv/
 .phase3-deps/
 .phase4-deps/
 .models/
+models/piper/*.onnx
 .pytest_cache/
 .coverage
 
