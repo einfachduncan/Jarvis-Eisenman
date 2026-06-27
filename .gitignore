@@ -8,6 +8,7 @@ __pycache__/
 venv/
 .test-deps/
 .phase2-deps/
+.phase3-deps/
 .pytest_cache/
 .coverage
 

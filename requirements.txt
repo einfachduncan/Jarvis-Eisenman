@@ -1,2 +1,6 @@
 google-genai>=1.75,<2.0
 python-dotenv>=1.2,<2.0
+faster-whisper>=1.2,<2.0
+numpy>=1.26,<3.0
+pyttsx3>=2.99,<3.0
+sounddevice>=0.5,<1.0

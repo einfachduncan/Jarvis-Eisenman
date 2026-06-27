@@ -5,6 +5,7 @@ from unittest.mock import Mock
 from config import ConfigurationError
 from gemini_client import ChatMessage, GeminiError
 from main import run_chat
+from voice import VoiceError
 
 
 class ChatTests(unittest.TestCase):
@@ -119,6 +120,86 @@ class ChatTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         output.assert_any_call("Error: offline")
+
+    def test_voice_command_records_and_speaks_response(self):
+        answers = iter(["voice", "exit"])
+        output = Mock()
+        streamed: list[str] = []
+        session = Mock()
+        session.stream.return_value = iter(["Good ", "evening."])
+        voice = Mock()
+        voice.listen.return_value = "Hello JARVIS"
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            streamed.append,
+            lambda: session,
+            lambda: voice,
+        )
+
+        self.assertEqual(result, 0)
+        session.stream.assert_called_once_with("Hello JARVIS")
+        voice.speak.assert_called_once_with(
+            "Good evening.", blocking=True
+        )
+        output.assert_any_call("Listening...")
+        output.assert_any_call("You (voice): Hello JARVIS")
+
+    def test_voice_error_does_not_close_chat(self):
+        answers = iter(["voice", "exit"])
+        output = Mock()
+        voice = Mock()
+        voice.listen.side_effect = VoiceError("no microphone")
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            Mock(),
+            lambda: voice,
+        )
+
+        self.assertEqual(result, 0)
+        output.assert_any_call("Voice error: no microphone")
+
+    def test_voice_input_can_be_cancelled_without_closing_chat(self):
+        answers = iter(["voice", "exit"])
+        output = Mock()
+        voice = Mock()
+        voice.listen.side_effect = KeyboardInterrupt
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            Mock(),
+            lambda: voice,
+        )
+
+        self.assertEqual(result, 0)
+        output.assert_any_call("\nVoice input cancelled.")
+
+    def test_speech_can_be_interrupted_without_closing_chat(self):
+        answers = iter(["voice", "exit"])
+        output = Mock()
+        session = Mock()
+        session.stream.return_value = iter(["Response"])
+        voice = Mock()
+        voice.listen.return_value = "Prompt"
+        voice.speak.side_effect = KeyboardInterrupt
+
+        result = run_chat(
+            lambda _prompt: next(answers),
+            output,
+            Mock(),
+            lambda: session,
+            lambda: voice,
+        )
+
+        self.assertEqual(result, 0)
+        voice.interrupt.assert_called_once_with(wait=True)
+        output.assert_any_call("\nSpeech interrupted.")
 
     def test_keyboard_interrupt_exits_cleanly(self):
         output = Mock()
