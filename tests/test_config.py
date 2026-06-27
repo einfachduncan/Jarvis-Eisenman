@@ -4,40 +4,36 @@ from unittest.mock import patch
 
 from config import (
     ConfigurationError,
-    DEFAULT_MODEL,
-    get_settings,
+    get_ollama_settings,
     get_voice_settings,
     get_wake_word_settings,
 )
 
 
-class SettingsTests(unittest.TestCase):
+class OllamaSettingsTests(unittest.TestCase):
     @patch("config.load_dotenv")
-    def test_missing_api_key_is_rejected(self, _load_dotenv):
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ConfigurationError):
-                get_settings()
-
-    @patch("config.load_dotenv")
-    def test_settings_are_trimmed(self, _load_dotenv):
+    def test_settings_are_loaded_and_trimmed(self, _load_dotenv):
         environment = {
-            "GEMINI_API_KEY": "  secret  ",
-            "GEMINI_MODEL": "  custom-model  ",
+            "OLLAMA_MODEL": "  qwen3:8b  ",
+            "OLLAMA_URL": "  http://localhost:11434/  ",
+            "OLLAMA_TIMEOUT": "30",
         }
         with patch.dict(os.environ, environment, clear=True):
-            settings = get_settings()
+            settings = get_ollama_settings()
 
-        self.assertEqual(settings.api_key, "secret")
-        self.assertEqual(settings.model, "custom-model")
+        self.assertEqual(settings.model, "qwen3:8b")
+        self.assertEqual(settings.url, "http://localhost:11434")
+        self.assertEqual(settings.timeout, 30)
 
     @patch("config.load_dotenv")
-    def test_empty_model_uses_default(self, _load_dotenv):
+    def test_invalid_url_is_rejected(self, _load_dotenv):
         with patch.dict(
             os.environ,
-            {"GEMINI_API_KEY": "secret", "GEMINI_MODEL": "  "},
+            {"OLLAMA_URL": "localhost:11434"},
             clear=True,
         ):
-            self.assertEqual(get_settings().model, DEFAULT_MODEL)
+            with self.assertRaisesRegex(ConfigurationError, "OLLAMA_URL"):
+                get_ollama_settings()
 
 
 class VoiceSettingsTests(unittest.TestCase):
@@ -47,7 +43,7 @@ class VoiceSettingsTests(unittest.TestCase):
             "WHISPER_MODEL": "small",
             "WHISPER_LANGUAGE": "de",
             "VOICE_SAMPLE_RATE": "22050",
-            "VOICE_TTS_VOLUME": "0.7",
+            "PIPER_MODEL_PATH": "models/piper/test.onnx",
         }
         with patch.dict(os.environ, environment, clear=True):
             settings = get_voice_settings()
@@ -55,7 +51,7 @@ class VoiceSettingsTests(unittest.TestCase):
         self.assertEqual(settings.model, "small")
         self.assertEqual(settings.language, "de")
         self.assertEqual(settings.sample_rate, 22050)
-        self.assertEqual(settings.tts_volume, 0.7)
+        self.assertEqual(settings.piper_model_path.name, "test.onnx")
 
     @patch("config.load_dotenv")
     def test_invalid_voice_number_is_rejected(self, _load_dotenv):
@@ -70,14 +66,14 @@ class VoiceSettingsTests(unittest.TestCase):
                 get_voice_settings()
 
     @patch("config.load_dotenv")
-    def test_invalid_tts_volume_is_rejected(self, _load_dotenv):
+    def test_piper_model_path_is_loaded(self, _load_dotenv):
         with patch.dict(
             os.environ,
-            {"VOICE_TTS_VOLUME": "1.5"},
+            {"PIPER_MODEL_PATH": "models/custom.onnx"},
             clear=True,
         ):
-            with self.assertRaisesRegex(ConfigurationError, "between 0 and 1"):
-                get_voice_settings()
+            settings = get_voice_settings()
+        self.assertEqual(settings.piper_model_path.name, "custom.onnx")
 
 
 class WakeWordSettingsTests(unittest.TestCase):

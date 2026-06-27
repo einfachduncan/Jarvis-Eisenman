@@ -136,3 +136,69 @@ The test suite does not make real API requests:
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+## Langzeitgedächtnis (Phase 5)
+
+Das Modul `memory.py` stellt eine SQLite-Datenbank (`jarvis.db`) mit fünf
+Tabellen bereit:
+
+| Tabelle         | Inhalt                                  |
+| --------------- | --------------------------------------- |
+| `conversations` | Gespeicherte Gesprächsverläufe          |
+| `memories`      | Schlüssel-Wert-Erinnerungen / Fakten    |
+| `settings`      | Persistente JARVIS-Einstellungen        |
+| `people`        | Personen, die JARVIS kennt              |
+| `notes`         | Freie Notizen mit Tags                  |
+
+Jede Tabelle unterstützt **Speichern, Laden, Suchen, Löschen und Bearbeiten**.
+`memories`, `people` und `notes` enthalten bereits eine `embedding`-Spalte für
+semantische Suche (wird in einer späteren Phase befüllt).
+
+```python
+from memory import init_db, save_memory, load_memory, save_person
+
+init_db()                              # Datenbank anlegen
+save_memory("name", "Duncan")          # Erinnerung speichern
+m = load_memory("name")                # Erinnerung laden
+save_person("Anna", notes="Freundin") # Person speichern
+```
+
+## PC-Steuerung (Phase 6)
+
+Das Modul `computer.py` erlaubt JARVIS die Kontrolle über den PC:
+
+| Funktion               | Beschreibung                                  |
+| ---------------------- | --------------------------------------------- |
+| `open_program`         | Programm öffnen                               |
+| `close_program`        | Prozess beenden                               |
+| `open_browser`         | URL im Browser öffnen                         |
+| `find_files`           | Dateien nach Name suchen                      |
+| `open_folder`          | Ordner im Explorer / Finder öffnen            |
+| `open_explorer`        | Alias für `open_folder`                       |
+| `take_screenshot`      | Screenshot erstellen und speichern            |
+| `clipboard_read/write` | Zwischenablage lesen / schreiben              |
+| `mouse_move/click`     | Mauszeiger steuern                            |
+| `mouse_scroll`         | Scrollen                                      |
+| `keyboard_type`        | Text tippen                                   |
+| `keyboard_hotkey`      | Tastenkombination drücken                     |
+| `keyboard_press`       | Einzeltaste drücken                           |
+| `move_window`          | Fenster verschieben (Windows only, pywin32)   |
+| `list_windows`         | Alle sichtbaren Fenster auflisten (Windows)   |
+| `set_volume`           | Systemlautstärke setzen (0–100)               |
+| `mute_volume`          | Stummschalten / aufheben                      |
+| `set_brightness`       | Helligkeit setzen (Windows only)              |
+| `shutdown`             | Computer herunterfahren                       |
+| `restart`              | Computer neu starten                          |
+| `open_task_manager`    | Taskmanager / Systemmonitor öffnen            |
+| `list_processes`       | Laufende Prozesse auflisten                   |
+
+Plattformübergreifend (Windows / macOS / Linux). Windows-spezifische
+Funktionen erfordern `pywin32`.
+
+```python
+from computer import open_browser, take_screenshot, keyboard_hotkey
+
+open_browser("https://example.com")
+path = take_screenshot()
+keyboard_hotkey("ctrl", "c")
+```

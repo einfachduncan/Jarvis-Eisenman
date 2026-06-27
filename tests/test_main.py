@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from config import ConfigurationError
-from gemini_client import ChatMessage, GeminiError
+from ollama_client import ChatMessage, OllamaError
 from main import run_chat
 from voice import VoiceError
 from wakeword import WakeWordError
@@ -41,7 +41,7 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(result, 1)
         output.assert_called_once_with("Configuration error: missing key")
 
-    def test_help_command_does_not_reach_gemini(self):
+    def test_help_command_does_not_reach_ollama(self):
         answers = iter(["help", "exit"])
         output = Mock()
         session = Mock()
@@ -110,7 +110,7 @@ class ChatTests(unittest.TestCase):
         output = Mock()
         streamed: list[str] = []
         session = Mock()
-        session.stream.side_effect = GeminiError("offline")
+        session.stream.side_effect = OllamaError("offline")
 
         result = run_chat(
             lambda _prompt: next(answers),

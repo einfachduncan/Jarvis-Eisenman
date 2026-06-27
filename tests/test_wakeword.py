@@ -103,6 +103,9 @@ class WakeWordTests(unittest.TestCase):
         )
 
     def test_model_download_uses_project_cache_and_onnx(self):
+        import openwakeword.model
+        import openwakeword.utils
+
         with tempfile.TemporaryDirectory() as temporary_directory:
             model_directory = Path(temporary_directory)
             settings = WakeWordSettings(

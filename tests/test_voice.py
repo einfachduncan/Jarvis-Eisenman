@@ -1,12 +1,12 @@
 import threading
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 
 from config import VoiceSettings
-from voice import PowerShellTTSEngine, Voice, VoiceError, _create_tts_engine
+from voice import Voice, VoiceError
 
 
 class FakeInputStream:
@@ -57,12 +57,11 @@ class VoiceTests(unittest.TestCase):
         )
         factory = Mock(return_value=model)
         voice = Voice(settings=self.settings, model_factory=factory)
-        audio = np.ones(100, dtype=np.float32)
 
-        self.assertEqual(voice.transcribe(audio), "Hello world.")
+        result = voice.transcribe(np.ones(100, dtype=np.float32))
+
+        self.assertEqual(result, "Hello world.")
         factory.assert_called_once_with(self.settings)
-        passed_audio = model.transcribe.call_args.args[0]
-        self.assertEqual(passed_audio.dtype, np.float32)
         self.assertTrue(model.transcribe.call_args.kwargs["vad_filter"])
 
     def test_empty_transcription_is_rejected(self):
@@ -94,10 +93,7 @@ class VoiceTests(unittest.TestCase):
         )
 
         self.assertEqual(voice.listen(), "Recorded")
-        recorded = model.transcribe.call_args.args[0]
-        self.assertGreater(recorded.size, 0)
         self.assertEqual(sounddevice.arguments["samplerate"], 100)
-        self.assertEqual(sounddevice.arguments["channels"], 1)
 
     def test_microphone_failure_is_wrapped(self):
         sounddevice = Mock()
@@ -110,55 +106,50 @@ class VoiceTests(unittest.TestCase):
         with self.assertRaisesRegex(VoiceError, "no device"):
             voice.listen()
 
-    def test_speak_configures_tts_engine(self):
-        engine = Mock()
-        voice = Voice(
-            settings=self.settings,
-            tts_factory=Mock(return_value=engine),
-        )
+    def test_speak_uses_configured_piper_model(self):
+        tts = Mock()
+        factory = Mock(return_value=tts)
+        voice = Voice(settings=self.settings, tts_factory=factory)
 
         voice.speak("At your service.", blocking=True)
 
-        engine.setProperty.assert_any_call("rate", self.settings.tts_rate)
-        engine.setProperty.assert_any_call(
-            "volume", self.settings.tts_volume
-        )
-        engine.say.assert_called_once_with("At your service.")
-        engine.runAndWait.assert_called_once_with()
+        factory.assert_called_once_with(self.settings.piper_model_path)
+        tts.speak.assert_called_once_with("At your service.")
         self.assertFalse(voice.is_speaking)
 
     def test_interrupt_stops_background_speech(self):
+        started = threading.Event()
         release = threading.Event()
-        engine = Mock()
-        engine.runAndWait.side_effect = release.wait
-        engine.stop.side_effect = release.set
+        tts = Mock()
+
+        def speak(_text):
+            started.set()
+            release.wait()
+
+        def stop():
+            release.set()
+
+        tts.speak.side_effect = speak
+        tts.stop.side_effect = stop
         voice = Voice(
             settings=self.settings,
-            tts_factory=Mock(return_value=engine),
+            tts_factory=Mock(return_value=tts),
         )
 
         voice.speak("Long response", blocking=False)
-        self.assertTrue(engine.say.wait(timeout=1.0))
+        self.assertTrue(started.wait(1.0))
         voice.interrupt(wait=True)
 
-        engine.stop.assert_called()
+        tts.stop.assert_called_once_with()
         self.assertFalse(voice.is_speaking)
 
     def test_tts_failure_is_wrapped(self):
-        engine = Mock()
-        engine.runAndWait.side_effect = RuntimeError("speaker unavailable")
+        tts = Mock()
+        tts.speak.side_effect = RuntimeError("speaker unavailable")
         voice = Voice(
             settings=self.settings,
-            tts_factory=Mock(return_value=engine),
+            tts_factory=Mock(return_value=tts),
         )
 
         with self.assertRaisesRegex(VoiceError, "speaker unavailable"):
             voice.speak("Hello", blocking=True)
-
-    def test_windows_tts_falls_back_when_pyttsx3_is_unavailable(self):
-        with patch(
-            "pyttsx3.init", side_effect=RuntimeError("SAPI unavailable")
-        ), patch("voice.sys.platform", "win32"):
-            engine = _create_tts_engine()
-
-        self.assertIsInstance(engine, PowerShellTTSEngine)

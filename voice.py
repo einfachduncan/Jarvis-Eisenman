@@ -6,11 +6,13 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from config import VoiceSettings, get_voice_settings
+from piper_tts import PiperTTS
 
 
 class VoiceError(RuntimeError):
@@ -42,12 +44,15 @@ class Voice:
         self,
         settings: VoiceSettings | None = None,
         model_factory: Callable[[VoiceSettings], Any] = _create_whisper_model,
+        tts_factory: Callable[[Path], PiperTTS] = PiperTTS,
         sounddevice_module: Any | None = None,
     ) -> None:
         self.settings = settings or get_voice_settings()
         self._model_factory = model_factory
+        self._tts_factory = tts_factory
         self._sounddevice = sounddevice_module
         self._model: Any | None = None
+        self._tts: PiperTTS | None = None
         self._speech_thread: threading.Thread | None = None
         self._speech_error: VoiceError | None = None
         self._stop_event = threading.Event()
@@ -90,6 +95,8 @@ class Voice:
             raise ValueError("Speech text must not be empty.")
 
         self.interrupt(wait=True)
+        if self.is_speaking:
+            raise VoiceError("Previous speech output could not be stopped.")
         self._stop_event.clear()
         self._speech_error = None
 
@@ -103,7 +110,11 @@ class Voice:
         thread.start()
 
         if blocking:
-            self.wait_until_done()
+            try:
+                self.wait_until_done()
+            except KeyboardInterrupt:
+                self.interrupt(wait=True)
+                raise
 
     def wait_until_done(self) -> None:
         thread = self._speech_thread
@@ -118,6 +129,10 @@ class Voice:
 
     def interrupt(self, *, wait: bool = False) -> None:
         self._stop_event.set()
+        with self._lock:
+            tts = self._tts
+        if tts is not None:
+            tts.stop()
 
         thread = self._speech_thread
 
@@ -131,15 +146,17 @@ class Voice:
 
     def _speak_worker(self, text: str) -> None:
         try:
-            from piper_tts import PiperTTS
-
+            tts = self._tts_factory(self.settings.piper_model_path)
+            with self._lock:
+                self._tts = tts
             if self._stop_event.is_set():
                 return
-
-            PiperTTS().speak(text)
-
+            tts.speak(text)
         except Exception as exc:
             self._speech_error = VoiceError(f"Speech output failed: {exc}")
+        finally:
+            with self._lock:
+                self._tts = None
 
     def _record_audio(self) -> np.ndarray:
         block_size = max(

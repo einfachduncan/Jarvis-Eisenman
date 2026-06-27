@@ -1,4 +1,4 @@
-"""Terminal entry point for the phase-3 JARVIS text and voice chat."""
+"""Terminal entry point for the phase-4 local JARVIS assistant."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def run_chat(
         output_fn(f"Configuration error: {exc}")
         return 1
 
-    output_fn("JARVIS Gemini Chat")
+    output_fn("JARVIS Local Chat (Ollama)")
     output_fn("Type help to see the available commands.")
     voice: Voice | None = None
     wake_word: WakeWordService | None = None
@@ -91,7 +91,7 @@ def run_chat(
                 try:
                     session.clear()
                     output_fn("Chat history cleared.")
-                except (ConfigurationError, GeminiError) as exc:
+                except (ConfigurationError, OllamaError) as exc:
                     output_fn(f"Error: {exc}")
                 continue
 
