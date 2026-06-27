@@ -1,1 +1,1 @@
-"""Tests for the Javis phase-1 project."""
+"""Tests for the JARVIS phase-2 project."""

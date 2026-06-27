@@ -1,12 +1,13 @@
 # Javis
 
-Phase 1 provides a small terminal chat that sends independent text prompts to
-Google Gemini. It deliberately does not include voice input or output, camera
-access, a GUI, conversation memory, or PC control.
+Phase 2 provides a persistent, streaming terminal conversation with Google
+Gemini and a dedicated JARVIS personality. The conversation remains available
+for the duration of the running program. It deliberately does not include
+voice input or output, camera access, a database, or a GUI.
 
 ## Requirements
 
-- Python 3.9 or newer
+- Python 3.10 or newer
 - A Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ## Installation
@@ -35,21 +36,36 @@ settings without containing a secret.
 python main.py
 ```
 
-Enter a prompt and press Enter. Use `/exit` to close the program. Each prompt
-is a separate request; storing conversation history belongs to a later phase.
+Enter a prompt and press Enter. Gemini's response is displayed as it arrives.
+The following commands are available:
+
+| Command | Action |
+| --- | --- |
+| `help` | Show all commands |
+| `history` | Show the current conversation |
+| `clear` | Start a fresh conversation |
+| `exit` | Close JARVIS |
+
+The slash forms such as `/history` also work. `clear` resets both the displayed
+history and the context sent to Gemini. History is intentionally not stored
+after the program exits because database persistence belongs to a later phase.
+
+JARVIS's behavior is defined in `prompts/jarvis.txt`.
 
 ## Use from Python
 
 ```python
-from gemini_client import ask
+from gemini_client import ChatSession
 
-answer = ask("Explain recursion in one sentence.")
-print(answer)
+chat = ChatSession()
+print(chat.send("My name is Alex."))
+print(chat.send("What is my name?"))
 ```
 
-`ask(prompt)` raises `ValueError` for an empty prompt, `ConfigurationError`
-when the API key is missing, and `GeminiError` if the API request fails or
-returns no text.
+Use `chat.stream(prompt)` to iterate over response chunks. The original
+`ask(prompt)` helper remains available for independent requests. Invalid input,
+missing configuration, API failures, and empty model responses are reported
+through `ValueError`, `ConfigurationError`, or `GeminiError`.
 
 ## Tests
 
