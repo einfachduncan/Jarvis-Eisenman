@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.test-deps/
+.pytest_cache/
+.coverage
+
+# Editors and operating systems
+.idea/
+.vscode/
+desktop.ini
+.DS_Store
